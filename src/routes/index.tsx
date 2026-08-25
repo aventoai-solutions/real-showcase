@@ -719,7 +719,8 @@ function DashboardPage() {
 }
 
 function WorkspaceView({ name }: { name: string }) {
-  const data = workspaceData[name] ?? workspaceData.Customers;
+  const data = workspaceData[name];
+  if (!data) return null;
   return (
     <div className="space-y-6">
       <div>
