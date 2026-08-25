@@ -24,13 +24,16 @@ import {
   Filter,
   LayoutDashboard,
   LifeBuoy,
+  Menu,
   Package,
   Search,
   Settings,
   ShoppingCart,
   Users,
   Wallet,
+  X,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -153,7 +156,7 @@ const activity = [
 ];
 
 const nav = [
-  { label: "Overview", icon: LayoutDashboard, active: true },
+  { label: "Overview", icon: LayoutDashboard },
   { label: "Customers", icon: Users },
   { label: "Orders", icon: ShoppingCart },
   { label: "Inventory", icon: Package },
@@ -161,11 +164,76 @@ const nav = [
   { label: "Payouts", icon: Wallet },
 ];
 
+const workspaceData: Record<string, { title: string; description: string; stats: Array<[string, string]>; rows: Array<[string, string, string]> }> = {
+  Customers: {
+    title: "Customers",
+    description: "Customer accounts, segments and lifetime value",
+    stats: [["Total customers", "3,184"], ["New this month", "264"], ["Repeat buyers", "37.8%"]],
+    rows: [["Marcus Reid", "Northline Supply", "$18,420 lifetime"], ["Amelia Chen", "Vertex Labs", "$12,860 lifetime"], ["Priya Nair", "Solace Interiors", "$9,730 lifetime"]],
+  },
+  Orders: {
+    title: "Orders",
+    description: "Track fulfillment and resolve order issues",
+    stats: [["Open orders", "128"], ["Ready to ship", "46"], ["Needs attention", "12"]],
+    rows: [["#ORD-10482", "Northline Supply", "Paid · $4,820"], ["#ORD-10481", "Vertex Labs", "Processing · $1,290"], ["#ORD-10480", "Baltic Freight", "Paid · $9,640"]],
+  },
+  Inventory: {
+    title: "Inventory",
+    description: "Stock levels across warehouses and sales channels",
+    stats: [["Active SKUs", "1,842"], ["Low stock", "24"], ["Inventory value", "$428K"]],
+    rows: [["NX Industrial Sensor", "Warehouse A", "284 in stock"], ["Precision Relay Kit", "Warehouse B", "18 in stock"], ["Control Module Pro", "Warehouse A", "96 in stock"]],
+  },
+  Payments: {
+    title: "Payments",
+    description: "Payment activity, disputes and reconciliation",
+    stats: [["Processed today", "$38,420"], ["Success rate", "98.6%"], ["Disputes", "3"]],
+    rows: [["PAY-90218", "Visa •••• 4242", "$4,820 · Successful"], ["PAY-90217", "Bank transfer", "$9,640 · Successful"], ["PAY-90216", "Mastercard •••• 8210", "$1,290 · Pending"]],
+  },
+  Payouts: {
+    title: "Payouts",
+    description: "Settlement schedule and bank transfers",
+    stats: [["Available", "$84,260"], ["In transit", "$22,180"], ["Next payout", "Aug 28"]],
+    rows: [["PO-22041", "Operating account", "$22,180 · In transit"], ["PO-22040", "Operating account", "$18,920 · Paid"], ["PO-22039", "Reserve account", "$7,500 · Paid"]],
+  },
+  Settings: {
+    title: "Settings",
+    description: "Manage your workspace, team and integrations",
+    stats: [["Team members", "14"], ["Integrations", "8 active"], ["Plan", "Business"]],
+    rows: [["Workspace profile", "Northex Operations", "Configured"], ["Notifications", "Email and in-app", "Enabled"], ["API access", "2 production keys", "Healthy"]],
+  },
+  Support: {
+    title: "Support",
+    description: "Help center and conversations with the support team",
+    stats: [["Open tickets", "2"], ["Average reply", "18 min"], ["System status", "Operational"]],
+    rows: [["#4471", "Payout reconciliation", "Resolved"], ["#4470", "Bulk inventory import", "Waiting on you"], ["Help center", "Browse 128 articles", "Available"]],
+  },
+};
+
 const currency = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
 function DashboardPage() {
   const [range, setRange] = useState<"7d" | "30d" | "12m">("12m");
+  const [activeView, setActiveView] = useState("Overview");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [channel, setChannel] = useState("All channels");
+
+  const openView = (label: string) => {
+    setActiveView(label);
+    setMenuOpen(false);
+  };
+
+  const exportOrders = () => {
+    const csv = ["Order,Customer,Company,Date,Status,Amount", ...orders.map((order) =>
+      [order.id, order.customer, order.company, order.date, order.status, order.amount].join(","),
+    )].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "northex-orders.csv";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
 
   const kpis = useMemo(() => {
     const factor = range === "7d" ? 0.06 : range === "30d" ? 0.24 : 1;
@@ -201,7 +269,14 @@ function DashboardPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex max-w-[1600px]">
-        <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar px-4 py-6 lg:flex">
+        {menuOpen && (
+          <button
+            aria-label="Close navigation"
+            className="fixed inset-0 z-20 bg-background/70 backdrop-blur-sm lg:hidden"
+            onClick={() => setMenuOpen(false)}
+          />
+        )}
+        <aside className={`fixed inset-y-0 left-0 z-30 flex h-screen w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar px-4 py-6 transition-transform lg:sticky lg:translate-x-0 ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}>
           <div className="flex items-center gap-3 px-2">
             <div
               className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold text-primary-foreground"
@@ -217,10 +292,12 @@ function DashboardPage() {
 
           <nav className="mt-8 space-y-1">
             {nav.map((item) => (
-              <button
+              <Button
                 key={item.label}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-                  item.active
+                variant="ghost"
+                onClick={() => openView(item.label)}
+                className={`h-9 w-full justify-start px-3 ${
+                  activeView === item.label
                     ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
                     : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
                 }`}
@@ -232,17 +309,17 @@ function DashboardPage() {
                     12
                   </span>
                 )}
-              </button>
+              </Button>
             ))}
           </nav>
 
           <div className="mt-auto space-y-1">
-            <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-foreground">
+            <Button variant="ghost" onClick={() => openView("Settings")} className={`h-9 w-full justify-start px-3 ${activeView === "Settings" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-muted-foreground"}`}>
               <Settings className="h-4 w-4" /> Settings
-            </button>
-            <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-foreground">
+            </Button>
+            <Button variant="ghost" onClick={() => openView("Support")} className={`h-9 w-full justify-start px-3 ${activeView === "Support" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-muted-foreground"}`}>
               <LifeBuoy className="h-4 w-4" /> Support
-            </button>
+            </Button>
             <div className="mt-4 rounded-xl border border-sidebar-border bg-card p-3">
               <p className="text-xs font-medium">Server health</p>
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -255,8 +332,11 @@ function DashboardPage() {
 
         <main className="min-w-0 flex-1">
           <header className="sticky top-0 z-10 flex flex-wrap items-center gap-4 border-b border-border bg-background/85 px-6 py-4 backdrop-blur">
+            <Button variant="outline" size="icon" className="lg:hidden" onClick={() => setMenuOpen((open) => !open)} aria-label="Open navigation">
+              {menuOpen ? <X /> : <Menu />}
+            </Button>
             <div className="min-w-0">
-              <h1 className="truncate text-lg font-semibold">Business overview</h1>
+              <h1 className="truncate text-lg font-semibold">{activeView === "Overview" ? "Business overview" : activeView}</h1>
               <p className="text-xs text-muted-foreground">
                 Tuesday, 25 August · data synced 2 minutes ago
               </p>
@@ -270,10 +350,10 @@ function DashboardPage() {
                   className="h-9 w-64 rounded-lg border border-input bg-card pl-9 pr-3 text-sm outline-none placeholder:text-muted-foreground focus:border-ring"
                 />
               </div>
-              <button className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:text-foreground">
+              <Button variant="outline" size="icon" className="relative text-muted-foreground" aria-label="Notifications" title="No new notifications">
                 <Bell className="h-4 w-4" />
                 <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-primary" />
-              </button>
+              </Button>
               <div className="flex items-center gap-2 rounded-lg border border-border bg-card py-1 pl-1 pr-3">
                 <div className="flex h-7 w-7 items-center justify-center rounded-md bg-secondary text-xs font-semibold">
                   SM
@@ -287,25 +367,28 @@ function DashboardPage() {
           </header>
 
           <div className="space-y-6 px-6 py-6">
+            {activeView === "Overview" ? <>
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex rounded-lg border border-border bg-card p-1">
                 {(["7d", "30d", "12m"] as const).map((r) => (
-                  <button
+                  <Button
                     key={r}
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setRange(r)}
-                    className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    className={`rounded-md px-3 text-xs ${
                       range === r
                         ? "bg-primary text-primary-foreground"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     {r === "7d" ? "Last 7 days" : r === "30d" ? "Last 30 days" : "Last 12 months"}
-                  </button>
+                  </Button>
                 ))}
               </div>
-              <button className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground">
-                <Filter className="h-3.5 w-3.5" /> All channels
-              </button>
+              <Button variant="outline" size="sm" className="text-muted-foreground" onClick={() => setChannel((current) => current === "All channels" ? "Direct only" : "All channels")}>
+                <Filter className="h-3.5 w-3.5" /> {channel}
+              </Button>
               <span className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" /> Live sync
                 enabled
@@ -585,9 +668,9 @@ function DashboardPage() {
                     Last 24 hours across all sales channels
                   </p>
                 </div>
-                <button className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
+                <Button variant="outline" size="sm" className="text-muted-foreground" onClick={exportOrders}>
                   Export CSV
-                </button>
+                </Button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[720px] text-sm">
@@ -627,9 +710,45 @@ function DashboardPage() {
             <p className="pb-4 text-center text-xs text-muted-foreground">
               Demo environment · React · Node.js · PostgreSQL
             </p>
+            </> : <WorkspaceView name={activeView} />}
           </div>
         </main>
       </div>
+    </div>
+  );
+}
+
+function WorkspaceView({ name }: { name: string }) {
+  const data = workspaceData[name] ?? workspaceData.Customers;
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-semibold">{data.title}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{data.description}</p>
+      </div>
+      <section className="grid gap-4 sm:grid-cols-3">
+        {data.stats.map(([label, value]) => (
+          <div key={label} className="rounded-xl border border-border bg-card p-5" style={{ boxShadow: "var(--shadow-panel)" }}>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
+            <p className="mt-2 text-2xl font-semibold">{value}</p>
+          </div>
+        ))}
+      </section>
+      <section className="overflow-hidden rounded-xl border border-border bg-card" style={{ boxShadow: "var(--shadow-panel)" }}>
+        <div className="border-b border-border px-5 py-4">
+          <h3 className="text-sm font-semibold">Recent activity</h3>
+          <p className="text-xs text-muted-foreground">Latest records in {data.title.toLowerCase()}</p>
+        </div>
+        <div className="divide-y divide-border">
+          {data.rows.map(([primary, secondary, status]) => (
+            <div key={primary} className="grid gap-1 px-5 py-4 sm:grid-cols-[1fr_1fr_auto] sm:items-center sm:gap-4">
+              <span className="text-sm font-medium">{primary}</span>
+              <span className="text-sm text-muted-foreground">{secondary}</span>
+              <span className="text-xs text-primary sm:text-right">{status}</span>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
